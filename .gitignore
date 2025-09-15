@@ -6,3 +6,4 @@ mlruns/
 .vscode/
 .idea/
 .pytest_cache/
+mlartifacts/

@@ -3,15 +3,23 @@ from pydantic import BaseModel
 import mlflow
 import numpy as np
 import os
+import random
+
+P = 0.7
 
 app = FastAPI(port=5700)
 mlflow_uri = os.getenv("MLFLOW_URI", "http://localhost:8080")
 mlflow.set_tracking_uri(mlflow_uri)
 
-model_name = "gdp_logistic_regression"
-model_version = "latest"
-model_uri = f"models:/{model_name}/{model_version}"
-mlflow_model = mlflow.sklearn.load_model(model_uri)
+curr_model_name = "gdp_logistic_regression"
+curr_model_version = "latest"
+model_uri = f"models:/{curr_model_name}/{curr_model_version}"
+
+next_model_name = "gdp_logistic_regression"
+next_model_version = "latest"
+
+current = mlflow.sklearn.load_model(model_uri)
+next = mlflow.sklearn.load_model(model_uri)
 
 class GDPInput(BaseModel):
     year_2020: float
@@ -24,9 +32,26 @@ class ModelVersionRequest(BaseModel):
     model_name: str
     version: str
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the GDP Prediction API"}
+@app.get("/current-model")
+def get_current_model():
+    return {
+        "name": curr_model_name,
+        "version": curr_model_version
+        }
+
+@app.get("/canary-deployment-info")
+def get_canary_deployment_info():
+    return { 
+        "current_model": {
+            "name": curr_model_name,
+            "version": curr_model_version
+        },
+        "next_model": {
+            "name": next_model_name,
+            "version": next_model_version
+        },
+        "P": P
+    }
 
 @app.get("/models")
 def get_all_models():
@@ -54,19 +79,40 @@ def predict_gdp(data: GDPInput):
             data.year_2023,
             data.year_2024
         ]], dtype=np.float64)
-    
-    prediction = mlflow_model.predict(input_data).tolist()
+
+    if random.random() < P:
+        selected_model = current
+        model_type = "current"
+        model_name = curr_model_name
+        model_version = curr_model_version
+    else:
+        selected_model = next
+        model_type = "next"
+        model_name = next_model_name
+        model_version = next_model_version
+
+    prediction = selected_model.predict(input_data).tolist()
 
     return {
         "y_pred": prediction[0],
-        "model": f"{model_name}:{model_version}"
+        "model": f"{model_name}:{model_version}",
+        "model_type": model_type
         }
 
-@app.put("/update-model")
+@app.post("/update-model")
 def update_model_version(request: ModelVersionRequest):
-    global mlflow_model, model_name, model_version
-    mlflow_model = mlflow.sklearn.load_model(f"models:/{request.model_name}/{request.version}")
-    model_name = request.model_name
-    model_version = request.version
+    global next, next_model_name, next_model_version
+    next = mlflow.sklearn.load_model(f"models:/{request.model_name}/{request.version}")
+    next_model_name = request.model_name
+    next_model_version = request.version
 
-    return {"message": f"Using model: {model_name}:{model_version}"}
+    return {"message": f"Next model updated to: {request.model_name}:{request.version}"}
+
+@app.post("/accept-next-model")
+def accept_next_model():
+    global current, curr_model_name, curr_model_version
+    current = next
+    curr_model_name = next_model_name
+    curr_model_version = next_model_version
+
+    return {"message": "Next model has been promoted to current model"}
