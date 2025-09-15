@@ -2,7 +2,7 @@ name: Publish Image
 on:
   push:
     tags:
-      - "publish-image"
+      - "publish-image-*"
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ps-mlops-mlflow-webapp
