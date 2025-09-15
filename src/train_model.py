@@ -1,15 +1,15 @@
 import mlflow
+from mlflow.models import infer_signature
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 mlflow.set_tracking_uri("http://localhost:8080")
 
-gdp_experiment = mlflow.set_experiment("GDP_Prediction")
-run_name = "LogisticRegression_GDP_Model"
+gdp_experiment = mlflow.set_experiment("GDP_Estimation_Models")
+run_name = "GDP_LogisticRegression_Model"
 artifact_path = "lr_gdp_model"
 
 df = pd.read_csv("../data/gdp_per_country.csv")
@@ -21,7 +21,7 @@ params = {
     "penalty": "l2",
     "C": 1.0,
     "solver": "lbfgs",
-    "max_iter": 1000,
+    "max_iter": 100000,
     "random_state": 42
 }
 
@@ -41,9 +41,11 @@ metrics = {"mae": mae, "mse": mse, "rmse": rmse, "r2": r2}
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_params(model.get_params())
     mlflow.log_metrics(metrics)
+    signature = infer_signature(X_train, y_pred)
     mlflow.sklearn.log_model(
-        sk_model=model, 
-        input_example=X_test.iloc[:5], 
-        registered_model_name=artifact_path,
-        name=artifact_path
-        )
+        sk_model=model,
+        name=artifact_path,
+        input_example=X_test[:5],
+        signature=signature,
+        registered_model_name="gdp_logistic_regression"
+    )

@@ -1,0 +1,10 @@
+services:
+  webapp:
+    container_name: mlflow-webapp
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "5700:5700"
+    environment:
+      - MLFLOW_URI=http://host.docker.internal:8080
