@@ -24,6 +24,10 @@ class ModelVersionRequest(BaseModel):
     model_name: str
     version: str
 
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the GDP Prediction API"}
+
 @app.get("/models")
 def get_all_models():
     client = mlflow.tracking.MlflowClient()
